@@ -420,13 +420,15 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
             
             // Data QR Code (menggunakan format JSON string)
             // Tambahkan jenis aset ke data QR Code
-            const qrData = JSON.stringify({
-                sekolah: data.schoolName,
-                jenis: data.assetType, // Data baru
-                nama: data.assetName,
-                kode: data.assetCode,
-                tgl: data.acquisitionDate
-            });
+            //const qrData = JSON.stringify({
+            //sekolah: data.schoolName,
+            //jenis: data.assetType, // Data baru
+            //    nama: data.assetName,
+            //    kode: data.assetCode,
+            //    tgl: data.acquisitionDate
+            //});
+            const qrData = data.assetName, 
+                    jenis: data.assetType;
 
             // Inisialisasi instance qrcode baru
             new QRCode(qrcodeDiv, {
