@@ -567,8 +567,9 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
             // Hapus QR Code lama jika ada
             qrcodeDiv.innerHTML = '';
             
-            // Data QR Code nama aset dan jenis aset
-            const qrData = `${data.assetName}\n${data.assetType}`;
+            // Data QR Code: nama aset, jenis aset, dan tanggal akuisisi
+            const formattedDate = formatAcquisitionDate(data.acquisitionDate);
+            const qrData = `${data.assetName}\n${data.assetType}\n${formattedDate}`;
 
             // Inisialisasi instance qrcode baru
             new QRCode(qrcodeDiv, {
