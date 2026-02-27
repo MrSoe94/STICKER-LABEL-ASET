@@ -27,6 +27,10 @@
             flex-shrink: 0; /* Pastikan stiker tidak menyusut */
         }
 
+        .label-content {
+            width: 100%;
+        }
+
         /* Kontainer untuk label yang dihasilkan */
         #batch-container {
             display: flex;
@@ -38,6 +42,11 @@
 
         /* --- PERBAIKAN CSS CETAK --- */
         @media print {
+            @page {
+                size: A4 portrait;
+                margin: 8mm;
+            }
+
             body {
                 background-color: white !important;
                 margin: 0;
@@ -57,7 +66,11 @@
             /* Sembunyikan elemen di dalam Panel Output yang tidak diperlukan saat cetak */
             #output-panel h2, 
             #output-panel #message, 
-            #output-panel #print-button {
+            #output-panel #print-actions {
+                display: none !important;
+            }
+
+            .label-checkbox {
                 display: none !important;
             }
             
@@ -65,6 +78,16 @@
             .flex.flex-col.lg\:flex-row {
                 display: block !important;
                 width: 100%;
+            }
+
+            #output-panel {
+                width: 100% !important;
+                background: white !important;
+                border: none !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
 
             /* Hapus batasan lebar pada kontainer paling luar */
@@ -77,29 +100,52 @@
             #batch-container {
                 width: 100% !important;
                 margin: 0;
-                /* PENTING: Menggunakan padding minimal dan gap agar dua stiker muat */
-                padding: 5px 0; 
-                gap: 5px; /* Jarak antar stiker */
+                padding: 0 !important;
+                gap: 4mm;
                 
-                /* Kunci utama: Tampilkan kembali sebagai flex container */
                 display: flex !important;
                 flex-wrap: wrap !important;
-                /* Gunakan space-evenly untuk mendistribusikan dua stiker di satu baris */
-                justify-content: space-evenly !important; 
+                justify-content: flex-start !important;
                 align-items: flex-start;
                 box-shadow: none;
                 background-color: white !important;
                 min-height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                border-radius: 0 !important;
             }
             
             .sticker-label {
-                border: 1px dashed #6b7280; 
-                /* Margin diperkecil agar dua stiker muat di kertas A4 */
-                margin: 2px; 
+                border: 1px dashed #6b7280 !important;
+                margin: 0; 
                 box-shadow: none;
-                /* Lebar 300px + 2px margin kiri + 2px margin kanan = 304px. 
-                   Ini akan memaksa dua stiker per baris di kertas A4 */
-                width: 300px; 
+                width: calc((100% - 4mm) / 2);
+                min-width: 0;
+                position: relative;
+                overflow: visible;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            /* Garis potong (crop marks) di setiap sudut label */
+            .sticker-label::after {
+                content: "";
+                position: absolute;
+                inset: -2.2mm;
+                pointer-events: none;
+                background:
+                    linear-gradient(#6b7280, #6b7280) left top / 5mm 0.25mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) left top / 0.25mm 5mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) right top / 5mm 0.25mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) right top / 0.25mm 5mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) left bottom / 5mm 0.25mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) left bottom / 0.25mm 5mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) right bottom / 5mm 0.25mm no-repeat,
+                    linear-gradient(#6b7280, #6b7280) right bottom / 0.25mm 5mm no-repeat;
+            }
+
+            body.print-selected-mode #batch-container .sticker-label.print-hidden {
+                display: none !important;
             }
         }
     </style>
@@ -119,7 +165,7 @@
                 <h2 class="text-2xl font-semibold mb-4 text-blue-700">Masukkan Data Aset</h2>
                 
                 <p class="text-sm text-red-600 mb-2 font-medium">
-                    Format wajib (Kolom A-E): Nama Sekolah,Nama Aset,Kode Inventaris,Tanggal Akuisisi (YYYY-MM-DD),**Jenis Aset**
+                    Format wajib (Kolom A-E): Nama Sekolah, Nama Aset, Kode Inventaris, Tanggal Akuisisi (DD MMMM YYYY), **Jenis Aset**
                 </p>
                 
                 <!-- Kontrol Impor/Template Diperbarui -->
@@ -165,10 +211,18 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
                     Silakan klik "Buat & Tampilkan Label" atau Impor File XLSX/CSV untuk melihat hasilnya.
                 </div>
 
-                <button id="print-button" onclick="window.print()" disabled
-                        class="mt-6 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                    Cetak Semua Label
-                </button>
+                <div id="print-actions" class="mt-6 w-full hidden">
+                    <div class="flex flex-wrap justify-center gap-3">
+                        <button id="print-selected-button" onclick="printSelectedLabels()" disabled
+                                class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                            Cetak Label Terpilih
+                        </button>
+                        <button id="print-button" onclick="window.print()" disabled
+                                class="px-5 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                            Cetak Semua Label
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -201,14 +255,23 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
          * Sekarang mendukung XLSX/XLS dan CSV/TXT.
          * @param {Event} event - Event unggahan file.
          */
+        function togglePrintActions(show) {
+            const printActions = document.getElementById('print-actions');
+            if (!printActions) return;
+            printActions.classList.toggle('hidden', !show);
+        }
+
         function handleFileUpload(event) {
             const file = event.target.files[0];
             const messageElement = document.getElementById('message');
             const printButton = document.getElementById('print-button');
+            const printSelectedButton = document.getElementById('print-selected-button');
 
             if (!file) {
                 messageElement.textContent = "Tidak ada file yang dipilih.";
                 printButton.disabled = true;
+                printSelectedButton.disabled = true;
+                togglePrintActions(false);
                 return;
             }
             
@@ -255,6 +318,8 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
                 } catch (error) {
                     messageElement.textContent = `Gagal memproses file: ${error.message}`;
                     printButton.disabled = true;
+                    printSelectedButton.disabled = true;
+                    togglePrintActions(false);
                 } finally {
                     // Bersihkan input file agar file yang sama bisa diupload ulang
                     event.target.value = ''; 
@@ -264,6 +329,8 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
             reader.onerror = function() {
                 messageElement.textContent = 'Gagal membaca file. Pastikan format file benar.';
                 printButton.disabled = true;
+                printSelectedButton.disabled = true;
+                togglePrintActions(false);
                 event.target.value = '';
             };
             
@@ -284,66 +351,172 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
             const container = document.getElementById('batch-container');
             const messageElement = document.getElementById('message');
             const printButton = document.getElementById('print-button');
-            
-            // Bersihkan kontainer sebelumnya
+            const printSelectedButton = document.getElementById('print-selected-button');
+
+            // Clear previous content
             container.innerHTML = '';
-            
+
             const lines = csvData.trim().split('\n');
             let generatedCount = 0;
 
             if (lines.length === 0 || csvData.trim() === '') {
                 messageElement.textContent = "Data CSV kosong. Harap masukkan data aset.";
                 printButton.disabled = true;
+                printSelectedButton.disabled = true;
+                togglePrintActions(false);
                 return;
             }
 
-            // Loop melalui setiap baris data
+            // Loop through each line of data
             lines.forEach((line, index) => {
                 const lineTrimmed = line.trim();
                 if (lineTrimmed === '') return;
 
-                // Pisahkan kolom menggunakan koma (CSV)
-                // Catatan: Ini adalah parser CSV yang sangat sederhana.
                 const columns = lineTrimmed.split(',').map(col => col.trim());
 
-                // Memastikan minimal 5 kolom ada (Dulu 4)
                 if (columns.length < 5) {
                     console.error(`Baris ${index + 1} diabaikan: Format tidak valid. Diperlukan 5 kolom, ditemukan ${columns.length}.`);
-                    return; // Lewati baris yang tidak valid
+                    return;
                 }
 
-                // Buat ID yang konsisten untuk elemen QR Code berdasarkan indeks
                 const qrcodeId = `qrcode-${index}`;
-                
-                // MENGAMBIL KOLOM KE-5 (INDEX 4) SEBAGAI JENIS ASET
+
                 const data = {
                     schoolName: columns[0],
                     assetName: columns[1],
                     assetCode: columns[2],
                     acquisitionDate: columns[3],
-                    assetType: columns[4], // Kolom baru
+                    assetType: columns[4],
                     qrcodeId: qrcodeId 
                 };
-                
-                // Hasilkan dan tambahkan HTML untuk label tunggal
+
                 const labelElement = document.createElement('div');
-                labelElement.innerHTML = generateSingleLabelHtml(data); 
-                container.appendChild(labelElement.firstElementChild); // Ambil div .sticker-label
-                
-                // Hasilkan QR Code di elemen label yang baru dibuat
+                labelElement.classList.add('sticker-label', 'bg-white');
+                labelElement.innerHTML = `
+                    <div class="flex items-start">
+                        <input type="checkbox" class="label-checkbox mr-2" data-label-id="${qrcodeId}">
+                        <div class="flex-grow">
+                            ${generateSingleLabelHtml(data)}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(labelElement);
+
                 generateQRCode(data.qrcodeId, data);
 
                 generatedCount++;
             });
 
-            // Perbarui status dan tombol cetak
             if (generatedCount > 0) {
                 messageElement.textContent = `Berhasil membuat ${generatedCount} label. Siap dicetak.`;
                 printButton.disabled = false;
+                printSelectedButton.disabled = false;
+                togglePrintActions(true);
             } else {
                 messageElement.textContent = "Tidak ada label yang valid ditemukan dari input CSV.";
                 printButton.disabled = true;
+                printSelectedButton.disabled = true;
+                togglePrintActions(false);
             }
+        }
+
+        /**
+         * Mencetak hanya label yang checkbox-nya dipilih.
+         */
+        function printSelectedLabels() {
+            const messageElement = document.getElementById('message');
+            const allLabels = Array.from(document.querySelectorAll('#batch-container > .sticker-label'));
+            const checkedBoxes = Array.from(document.querySelectorAll('.label-checkbox:checked'));
+
+            if (checkedBoxes.length === 0) {
+                messageElement.textContent = "Pilih minimal satu label sebelum mencetak label terpilih.";
+                return;
+            }
+
+            const selectedLabelSet = new Set(
+                checkedBoxes
+                    .map((checkbox) => checkbox.closest('.sticker-label'))
+                    .filter(Boolean)
+            );
+
+            allLabels.forEach((label) => {
+                if (selectedLabelSet.has(label)) {
+                    label.classList.remove('print-hidden');
+                } else {
+                    label.classList.add('print-hidden');
+                }
+            });
+
+            document.body.classList.add('print-selected-mode');
+
+            const cleanupAfterPrint = () => {
+                document.body.classList.remove('print-selected-mode');
+                allLabels.forEach((label) => label.classList.remove('print-hidden'));
+            };
+
+            window.addEventListener('afterprint', cleanupAfterPrint, { once: true });
+            window.print();
+        }
+
+        /**
+         * Format tanggal ke bentuk "DD Bulan YYYY" (contoh: 01 Januari 2025).
+         * Mendukung input utama: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD.
+         * @param {string} rawDate
+         * @returns {string}
+         */
+        function formatAcquisitionDate(rawDate) {
+            const value = (rawDate || '').trim();
+            if (!value) return value;
+
+            const monthNames = [
+                'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ];
+
+            let day;
+            let month;
+            let year;
+            let match = value.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+
+            // DD/MM/YYYY atau DD-MM-YYYY
+            if (match) {
+                day = parseInt(match[1], 10);
+                month = parseInt(match[2], 10);
+                year = parseInt(match[3], 10);
+            } else {
+                // YYYY-MM-DD atau YYYY/MM/DD
+                match = value.match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);
+                if (match) {
+                    year = parseInt(match[1], 10);
+                    month = parseInt(match[2], 10);
+                    day = parseInt(match[3], 10);
+                }
+            }
+
+            if (day && month && year) {
+                const candidate = new Date(year, month - 1, day);
+                const isValidDate =
+                    candidate.getFullYear() === year &&
+                    candidate.getMonth() === month - 1 &&
+                    candidate.getDate() === day;
+
+                if (isValidDate) {
+                    return `${String(day).padStart(2, '0')} ${monthNames[month - 1]} ${year}`;
+                }
+            }
+
+            // Fallback ke parser native jika format tidak cocok dengan pola utama
+            const parsed = new Date(value);
+            if (!isNaN(parsed)) {
+                return parsed.toLocaleDateString('id-ID', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                });
+            }
+
+            // Jika tetap tidak bisa diparse, tampilkan nilai asli
+            return value;
         }
 
         /**
@@ -351,50 +524,26 @@ SMKN 3 TEKNIK,Mesin Cetak 3D,INV/SMK3/MC/2025/004,2025-01-10,Hibah</textarea>
          * @param {Object} data - Objek data aset. Harus menyertakan data.qrcodeId dan data.assetType.
          */
         function generateSingleLabelHtml(data) {
-            // Format tanggal agar lebih mudah dibaca
-            let formattedDate;
-            try {
-                const dateObj = new Date(data.acquisitionDate);
-                // Cek apakah tanggal valid sebelum format
-                if (isNaN(dateObj) || data.acquisitionDate.length < 10) { // Cek format tanggal (YYYY-MM-DD)
-                    formattedDate = data.acquisitionDate;
-                } else {
-                    formattedDate = dateObj.toLocaleDateString('id-ID', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    });
-                }
-            } catch (e) {
-                formattedDate = data.acquisitionDate; // Tampilkan mentah jika format gagal
-            }
+            const formattedDate = formatAcquisitionDate(data.acquisitionDate);
 
             // Gunakan ID yang sudah disediakan di objek data (data.qrcodeId)
             const qrcodeId = data.qrcodeId;
-            
             return `
-                <div class="sticker-label bg-white">
+                <div class="label-content bg-white">
                     <div class="text-center border-b pb-1 mb-2 border-gray-400">
                         <p class="font-bold text-xs uppercase text-blue-800">${data.schoolName}</p>
-                        <!-- MENAMPILKAN JENIS ASET BARU -->
                         <p class="text-xs text-gray-600 font-medium mt-0.5">${data.assetType}</p>
                     </div>
-                    
                     <div class="flex items-start">
                         <div class="flex-grow">
                             <p class="text-xs text-gray-600 font-medium">Aset:</p>
                             <p class="font-extrabold text-sm leading-tight text-gray-900 mb-1">${data.assetName}</p>
-                            
                             <p class="text-xs text-gray-600 font-medium">Kode INV:</p>
                             <p class="font-mono text-xs leading-snug text-gray-700 mb-1">${data.assetCode}</p>
-                            
                             <p class="text-xs text-gray-600 font-medium">Tgl Akuisisi:</p>
                             <p class="text-xs leading-snug text-gray-700">${formattedDate}</p>
                         </div>
-
-                        <!-- Tambahkan padding (p-1) untuk memastikan ada zona tenang (quiet zone) yang cukup -->
                         <div id="${qrcodeId}" class="ml-4 flex-shrink-0 p-1">
-                            <!-- QR Code akan dihasilkan di sini -->
                         </div>
                     </div>
                 </div>
